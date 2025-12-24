@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"   # optional: daily
+    - cron: "0 0 * * *"   # optional: run daily
 
 jobs:
   update-ads:
@@ -16,9 +16,10 @@ jobs:
       CF_ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl jq
@@ -31,27 +32,36 @@ jobs:
           curl -s "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/MobileFilter/sections/adservers.txt" -o lists/3.txt
           curl -s "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Browse%20Config/IndianList.txt" -o lists/4.txt
 
-      - name: Build single domain list (basic)
+      - name: Build merged domain list
         run: |
           cat lists/*.txt \
             | sed 's/[ 
 ].*$//' \
             | grep -E '^[a-zA-Z0-9.-]+$' \
             | sort -u > all-domains.txt
-          head all-domains.txt
+          echo "First 20 domains:"
+          head -n 20 all-domains.txt
+
+      - name: Prepare JSON body
+        run: |
+          # Convert domains to Cloudflare list items
+          jq -R -s 'split("
+")[:-1] | map({value: ., type: "hostname"})' all-domains.txt > items.json
+
+          # Build full list object
+          jq -n \
+            --arg name "ads-block" \
+            --arg desc "Adblock domains from multiple lists" \
+            --slurpfile items items.json \
+            '{name:$name, description:$desc, type:"DOMAIN", items:$items[0]}' > body.json
+
+          echo "Request body:"
+          head -c 500 body.json || true
 
       - name: Upload to Cloudflare Gateway list
         run: |
-          # create or update one DNS hostname list called "ads-block"
-          BODY=$(jq -n \
-            --arg name "ads-block" \
-            --arg desc "Adblock domains from multiple lists" \
-            --argjson items "$(jq -R -s 'split("
-")[:-1] | map({value: ., type: "hostname"})' all-domains.txt)" \
-            '{name:$name, description:$desc, type:"DOMAIN", items:$items}')
-
-          curl -X PUT \
+          curl -v -X PUT \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/gateway/lists/ads-block" \
-            --data "${BODY}"
+            --data @body.json
