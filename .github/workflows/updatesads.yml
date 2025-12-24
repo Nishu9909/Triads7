@@ -2,10 +2,8 @@ name: Update Cloudflare Adblock
 on:
   push:
     paths:
-      - 'blocklist.txt'
-  schedule:
-    - cron: '0 0 * * *' # Runs daily at midnight
-  workflow_dispatch:
+      - 'blocklist.txt' # Triggers only when you change your list
+  workflow_dispatch:      # Allows you to click "Run workflow" manually
 
 jobs:
   build:
@@ -17,9 +15,9 @@ jobs:
         with:
           node-version: '18'
       - name: Install dependencies
-        run: npm install
-      - name: Run Update Script
-        run: node index.js # Change this to the main file of your chosen script
+        run: npm install # Ensure you have a package.json in your repo
+      - name: Run Upload Script
+        run: node index.js # This runs the actual logic
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
