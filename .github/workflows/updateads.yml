@@ -1,36 +1,57 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"   # optional: daily
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  update-ads:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    env:
+      CF_API_TOKEN: ${{ secrets.API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Install deps
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+
+      - name: Download blocklists
+        run: |
+          mkdir lists
+          curl -s "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/multi.txt" -o lists/1.txt
+          curl -s "https://raw.githubusercontent.com/SJvV/OIS/main/oisd_big.txt" -o lists/2.txt
+          curl -s "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/MobileFilter/sections/adservers.txt" -o lists/3.txt
+          curl -s "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Browse%20Config/IndianList.txt" -o lists/4.txt
+
+      - name: Build single domain list (basic)
+        run: |
+          cat lists/*.txt \
+            | sed 's/[ 
+].*$//' \
+            | grep -E '^[a-zA-Z0-9.-]+$' \
+            | sort -u > all-domains.txt
+          head all-domains.txt
+
+      - name: Upload to Cloudflare Gateway list
+        run: |
+          # create or update one DNS hostname list called "ads-block"
+          BODY=$(jq -n \
+            --arg name "ads-block" \
+            --arg desc "Adblock domains from multiple lists" \
+            --argjson items "$(jq -R -s 'split("
+")[:-1] | map({value: ., type: "hostname"})' all-domains.txt)" \
+            '{name:$name, description:$desc, type:"DOMAIN", items:$items}')
+
+          curl -X PUT \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/gateway/lists/ads-block" \
+            --data "${BODY}"
