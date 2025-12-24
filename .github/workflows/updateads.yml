@@ -32,26 +32,38 @@ jobs:
           curl -s "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/MobileFilter/sections/adservers.txt" -o lists/3.txt
           curl -s "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Browse%20Config/IndianList.txt" -o lists/4.txt
 
-      - name: Build merged domain list
+      - name: Build small domain list
         run: |
           cat lists/*.txt \
             | sed 's/[ 
 ].*$//' \
             | grep -E '^[a-zA-Z0-9.-]+$' \
-            | sort -u > all-domains.txt
+            | sort -u \
+            | head -n 1000 > all-domains.txt
           echo "First 20 domains:"
           head -n 20 all-domains.txt
 
-      - name: Prepare JSON body
+      - name: Create JSON body
         run: |
-          jq -R -s 'split("
-")[:-1] | map({value: ., type: "hostname"})' all-domains.txt > items.json
+          echo '{' > body.json
+          echo '  "name": "ads-block",' >> body.json
+          echo '  "description": "Test adblock list from GitHub",' >> body.json
+          echo '  "type": "DOMAIN",' >> body.json
+          echo '  "items": [' >> body.json
 
-          jq -n \
-            --arg name "ads-block" \
-            --arg desc "Adblock domains from multiple lists" \
-            --slurpfile items items.json \
-            '{name:$name, description:$desc, type:"DOMAIN", items:$items[0]}' > body.json
+          first=1
+          while read -r domain; do
+            [ -z "$domain" ] && continue
+            if [ $first -eq 0 ]; then
+              echo ',' >> body.json
+            fi
+            first=0
+            printf '    {"value":"%s","type":"hostname"}' "$domain" >> body.json
+          done < all-domains.txt
+
+          echo '' >> body.json
+          echo '  ]' >> body.json
+          echo '}' >> body.json
 
           echo "Request body (truncated):"
           head -c 500 body.json || true
