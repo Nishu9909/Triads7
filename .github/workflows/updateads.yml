@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"   # optional: run daily
+    - cron: "0 0 * * *"
 
 jobs:
   update-ads:
@@ -44,18 +44,16 @@ jobs:
 
       - name: Prepare JSON body
         run: |
-          # Convert domains to Cloudflare list items
           jq -R -s 'split("
 ")[:-1] | map({value: ., type: "hostname"})' all-domains.txt > items.json
 
-          # Build full list object
           jq -n \
             --arg name "ads-block" \
             --arg desc "Adblock domains from multiple lists" \
             --slurpfile items items.json \
             '{name:$name, description:$desc, type:"DOMAIN", items:$items[0]}' > body.json
 
-          echo "Request body:"
+          echo "Request body (truncated):"
           head -c 500 body.json || true
 
       - name: Upload to Cloudflare Gateway list
