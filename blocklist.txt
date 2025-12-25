@@ -1,6 +1,4 @@
 
-
-https://raw.githubusercontent.com/hagez/dnsblocklists/main/adblock/pro.plus.txt
 https://raw.githubusercontent.com/sjhgvr/oisd/main/oisd_big.txt
 
 
