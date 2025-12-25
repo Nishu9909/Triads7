@@ -1,4 +1,12 @@
-https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/multi.txt
-https://raw.githubusercontent.com/SJvV/OIS/main/oisd_big.txt
-https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/masterMobileFilter/sections/adservers.txt
-https://raw,githubusercontent.com/DandelionSprout/adfilt/master/Browse%20Config/IndianList.txt
+
+
+https://raw.githubusercontent.com/hagez/dnsblocklists/main/adblock/pro.plus.txt
+https://raw.githubusercontent.com/sjhgvr/oisd/main/oisd_big.txt
+
+
+
+
+
+
+
+
